@@ -9,6 +9,7 @@ import os
 import pickle
 import xlrd
 import csv
+import zipfile
 
 from nltk.tokenize import word_tokenize
 
@@ -26,17 +27,18 @@ if not os.path.isdir(LBSA_DATA_DIR):
 
 class Lexicon:
 
-    def __init__(self, dataframe, sentiment_names, language='english'):
+    def __init__(self, dataframe, tag_names, source, language='english'):
         self.dataframe = dataframe
-        self.sentiment_names = sentiment_names
+        self.tag_names = tag_names
+        self.source = source
         self.language = language
         self.table = dict()
         self.set_language(self.table, language)
 
     def set_language(self, table, language):
-        sentiments = np.asarray(self.dataframe[self.sentiment_names])
-        for key, value in zip(self.dataframe[self.language], sentiments):
-            if value.sum() > 0:
+        tags = np.asarray(self.dataframe[self.tag_names])
+        for key, value in zip(self.dataframe[self.language], tags):
+            if value.sum() != 0:
                 table[key] = value
     
     def get(self, token):
@@ -44,15 +46,15 @@ class Lexicon:
             return None
         return self.table.get(token)
     
-    def get_n_sentiments(self):
-        return len(self.sentiment_names)
+    def get_n_tags(self):
+        return len(self.tag_names)
     
-    def get_sentiment_names(self):
-        return self.sentiment_names
+    def get_tag_names(self):
+        return self.tag_names
     
     def get_analysis(self, counters):
         return {
-            name: counter for name, counter in zip(self.sentiment_names, counters)
+            name: counter for name, counter in zip(self.tag_names, counters)
         }
     
     def __len__(self):
@@ -87,16 +89,86 @@ def load_nrc_lexicon():
     return nrc_all_languages, sentiment_names
 
 
-def create_lexicon(language='english'):
-    nrc_all_languages, sentiment_names = load_nrc_lexicon()
-    lexicon = Lexicon(nrc_all_languages, sentiment_names, language=language)
+def load_bing_opinion_lexicon():
+    bing_filename = "opinion-lexicon-English"
+    if not os.path.isdir(os.path.join(LBSA_DATA_DIR, "bing")):
+        os.makedirs(os.path.join(LBSA_DATA_DIR, "bing"))
+    if not os.path.exists(os.path.join(LBSA_DATA_DIR, "bing/positive.txt")):
+        # Download rar archive
+        LEXICON_URL = "http://www.cs.uic.edu/~liub/FBS/%s.rar" % bing_filename
+        filepath = os.path.join(LBSA_DATA_DIR, "%s.rar" % bing_filename)
+        urlretrieve(LEXICON_URL, filepath)
+        rar = rarfile.RarFile(filepath)
+        rar.extractall(path=os.path.join(LBSA_DATA_DIR, "bing"))
+        # TODO
+
+
+def load_afinn_opinion_lexicon():
+    if not os.path.isdir(os.path.join(LBSA_DATA_DIR, "afinn")):
+        os.makedirs(os.path.join(LBSA_DATA_DIR, "afinn"))
+    if not os.path.exists(os.path.join(LBSA_DATA_DIR, "afinn/AFINN/AFINN-111.txt")):
+        # Download zip archive
+        LEXICON_URL = 'http://www2.imm.dtu.dk/pubdb/views/edoc_download.php/6010/zip/imm6010.zip'
+        filepath = os.path.join(LBSA_DATA_DIR, "afinn/imm6010.zip")
+        urlretrieve(LEXICON_URL, filepath)
+        with zipfile.ZipFile(filepath) as zf:
+            zf.extractall(path=os.path.join(LBSA_DATA_DIR, "afinn"))
+        # Remove zip archive
+        os.remove(filepath)
+    
+    words, values = list(), list()
+    with open(os.path.join(LBSA_DATA_DIR, 'afinn/AFINN/AFINN-111.txt')) as f:
+        for line in f.readlines():
+            items = line.split('\t')
+            if len(items) == 2:
+                words.append(items[0])
+                values.append(int(items[1]))
+    values = np.asarray(values, dtype=np.int)
+    positives = np.zeros(len(values), dtype=np.int)
+    negatives = np.zeros(len(values), dtype=np.int)
+    positives[values > 0] = values[values > 0]
+    negatives[values < 0] = -values[values < 0]
+    data = pd.DataFrame({
+        'english': words,
+        'positive': positives,
+        'negative': negatives
+    })
+    return data
+
+
+def create_sa_lexicon(source='nrc', language='english'):
+    if source == 'nrc':
+        nrc_all_languages, tag_names = load_nrc_lexicon()
+        to_remove = ['positive', 'negative']
+        nrc_all_languages.drop(to_remove, axis=1, inplace=True)
+        for tag_name in to_remove:
+            tag_names.remove(tag_name)
+        lexicon = Lexicon(nrc_all_languages, tag_names, source, language=language)
+    else:
+        pass # TODO: error
     return lexicon
 
 
-def sentiment_analysis(text, lexicon):
+def create_opinion_lexicon(source='nrc', language='english'):
+    if source == 'nrc':
+        nrc_all_languages, tag_names = load_nrc_lexicon()
+        to_remove = ["anger", "anticipation", "disgust", "fear", "joy", "sadness", "surprise", "trust"]
+        nrc_all_languages.drop(to_remove, axis=1, inplace=True)
+        for tag_name in to_remove:
+            tag_names.remove(tag_name)
+        lexicon = Lexicon(nrc_all_languages, tag_names, source, language=language)
+    elif source == 'afinn':
+        ol = load_afinn_opinion_lexicon()
+        lexicon = Lexicon(ol, ['positive', 'negative'], source, language=language)
+    else:
+        pass # TODO: error
+    return lexicon
+
+
+def make_analysis(text, lexicon):
     tokens = word_tokenize(text)
-    n_sentiments = lexicon.get_n_sentiments()
-    counters = np.zeros(n_sentiments, dtype=np.int)
+    n_tags = lexicon.get_n_tags()
+    counters = np.zeros(n_tags, dtype=np.int)
     for token in tokens:
         value = lexicon.get(token.lower())
         if value is not None:
@@ -104,16 +176,16 @@ def sentiment_analysis(text, lexicon):
     return lexicon.get_analysis(counters)
 
 
-def time_analysis(text, lexicon):
+def make_time_analysis(text, lexicon):
     tokens = word_tokenize(text)
-    n_sentiments = lexicon.get_n_sentiments()
-    sentiment_names = lexicon.get_sentiment_names()
-    mask = np.zeros((len(tokens), n_sentiments), dtype=np.int)
+    n_tags = lexicon.get_n_tags()
+    tag_names = lexicon.get_tag_names()
+    mask = np.zeros((len(tokens), n_tags), dtype=np.int)
     for token_id, token in enumerate(tokens):
         value = lexicon.get(token.lower())
         if value is not None:
             mask[token_id, :] += value
-    features = {
-        key: value for key, value in zip(sentiment_names, mask.T)
+    data = {
+        key: value for key, value in zip(tag_names, mask.T)
     }
-    return features
+    return data

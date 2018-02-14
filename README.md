@@ -13,13 +13,13 @@ $ sudo python setup.py install
 ### Dependencies
 
 * numpy >= 1.13.3
-* matplotlib >= 2.0.2
+* matplotlib >= 2.0.2 (optional)
 * nltk >= 3.2.3
 * xlrd
 
 ## Features
 
-### Sentiment anaysis
+### Sentiment analysis
 
 ```python
 >>> import lbsa
@@ -28,10 +28,18 @@ $ sudo python setup.py install
 ... It ends the dangerous sequester and gives Secretary Mattis what he needs to keep America Great.
 ... Republicans and Democrats must support our troops and support this Bill!
 ... """
->>> lexicon = lbsa.create_lexicon(language='english')
->>> lbsa.sentiment_analysis(tweet, lexicon)
-{'positive': 2, 'negative': 1, 'anger': 0, 'anticipation': 0, 'disgust': 0, 'fear': 2, 
-'joy': 0, 'sadness': 0, 'surprise': 0, 'trust': 3}
+>>> lexicon = lbsa.create_sa_lexicon(language='english', source='nrc')
+>>> lbsa.make_analysis(tweet, lexicon)
+{'anger': 0, 'anticipation': 0, 'disgust': 0, 'fear': 2, 'joy': 0, 'sadness': 0, 
+'surprise': 0, 'trust': 3}
+```
+
+### Opinion mining
+
+```python
+>>> lexicon = lbsa.create_opinion_lexicon(language='english', source='nrc')
+>>> lbsa.make_analysis(tweet, lexicon)
+{'positive': 2, 'negative': 1}
 ```
 
 ### Sentiment analysis over time

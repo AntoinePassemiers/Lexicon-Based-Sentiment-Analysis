@@ -5,6 +5,7 @@
 import lbsa
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 def moving_average(sequence, n=1000):
@@ -16,26 +17,13 @@ def moving_average(sequence, n=1000):
 # https://archive.org/stream/thusspokezarathu00nietuoft/thusspokezarathu00nietuoft_djvu.txt
 with open('../../data/thus_spoke_zarathustra.txt', 'r') as f:
     text = f.read()
-    lexicon = lbsa.create_lexicon(language='english')
-    features = lbsa.time_analysis(text, lexicon)
-
-    import matplotlib.pyplot as plt
-
-    polarity = features['positive'] - features['negative']
+    lexicon = lbsa.create_sa_lexicon(language='english')
+    features = lbsa.make_time_analysis(text, lexicon)
 
     block_size = 100
-    new_length = len(polarity) - (len(polarity) % block_size)
-    polarity = np.mean(polarity[:new_length].reshape(-1, block_size), axis=1)
-    polarity = moving_average(polarity, n=50)
-    plt.plot(polarity)
 
-    fig = plt.gcf()
-    fig.set_size_inches(18.5, 10.5)
-    fig.savefig('polarity.png', dpi=100)
-
-    n_sentiments = lexicon.get_n_sentiments()
-    sentiment_names = lexicon.get_sentiment_names()
-    for feature_name in sentiment_names[2:]:
+    tag_names = lexicon.get_tag_names()
+    for feature_name in tag_names:
         feature = features[feature_name]
         new_length = len(feature) - (len(feature) % block_size)
         feature = np.mean(feature[:new_length].reshape(-1, block_size), axis=1)
