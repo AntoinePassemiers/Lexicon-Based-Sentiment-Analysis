@@ -1,0 +1,9 @@
+*.pyc
+*.csv
+
+__pycache__/
+build/
+dist/
+lbsa.egg-info/
+
+thus_spoke_zarathustra.txt
