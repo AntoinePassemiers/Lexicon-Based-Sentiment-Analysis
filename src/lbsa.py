@@ -6,12 +6,11 @@ import numpy as np
 import pandas as pd
 import collections
 import os
+import re
 import pickle
 import xlrd
 import csv
 import zipfile
-
-from nltk.tokenize import word_tokenize
 
 try: # Python 3
     from urllib.request import urlretrieve
@@ -136,6 +135,11 @@ def load_afinn_opinion_lexicon():
     return data
 
 
+def tokenize(text):
+    re_tok = re.compile(f'([!"#$%&\'()*+,-./:;<=>?@[\\]^_`|~“”¨«»®´·º½¾¿¡§£₤‘’])')
+    return re_tok.sub(r' \1 ', text).split()
+
+
 def create_sa_lexicon(source='nrc', language='english'):
     if source == 'nrc':
         nrc_all_languages, tag_names = load_nrc_lexicon()
@@ -165,19 +169,19 @@ def create_opinion_lexicon(source='nrc', language='english'):
     return lexicon
 
 
-def make_analysis(text, lexicon):
-    tokens = word_tokenize(text)
+def make_analysis(text, lexicon, as_dict=True):
+    tokens = tokenize(text)
     n_tags = lexicon.get_n_tags()
     counters = np.zeros(n_tags, dtype=np.int)
     for token in tokens:
         value = lexicon.get(token.lower())
         if value is not None:
             counters += value
-    return lexicon.get_analysis(counters)
+    return lexicon.get_analysis(counters) if as_dict else counters
 
 
 def make_time_analysis(text, lexicon):
-    tokens = word_tokenize(text)
+    tokens = tokenize(text)
     n_tags = lexicon.get_n_tags()
     tag_names = lexicon.get_tag_names()
     mask = np.zeros((len(tokens), n_tags), dtype=np.int)

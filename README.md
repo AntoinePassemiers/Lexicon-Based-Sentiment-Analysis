@@ -14,7 +14,6 @@ $ sudo python setup.py install
 
 * numpy >= 1.13.3
 * matplotlib >= 2.0.2 (optional)
-* nltk >= 3.2.3
 * xlrd
 
 ## Features
