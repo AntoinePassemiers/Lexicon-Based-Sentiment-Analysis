@@ -1,3 +1,4 @@
 language: python
 python:
   - "3.6"
+script: nosetests -v test/test_lbda.py
