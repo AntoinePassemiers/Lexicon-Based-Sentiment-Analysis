@@ -1,3 +1,4 @@
+[![Travis-CI Build Status](https://travis-ci.org/AntoinePassemiers/Lexicon-Based-Sentiment-Analysis.svg?branch=master)](https://travis-ci.org/AntoinePassemiers/Lexicon-Based-Sentiment-Analysis)
 # LBSA - Lexicon-based Sentiment Analysis
 
 http://www.saifmohammad.com/WebPages/lexicons.html
