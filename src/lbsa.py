@@ -4,13 +4,14 @@
 
 import numpy as np
 import pandas as pd
-import collections
 import os
 import re
+import io
 import pickle
 import xlrd
 import csv
 import zipfile
+import requests
 
 try: # Python 3
     from urllib.request import urlretrieve
@@ -23,6 +24,15 @@ LBSA_DATA_DIR = os.path.join(home, 'lbsa_data')
 if not os.path.isdir(LBSA_DATA_DIR):
     os.makedirs(LBSA_DATA_DIR)
 
+TOKENIZER = re.compile(f'([!"#$%&\'()*+,-./:;<=>?@[\\]^_`|~“”¨«»®´·º½¾¿¡§£₤‘’])')
+
+
+class UnknownSource(Exception):
+    def __init__(self, *args, **kwargs):
+        Exception.__init__(self, *args, **kwargs)
+
+
+# http://sentiment.christopherpotts.net/lexicons.html#resources
 
 class Lexicon:
 
@@ -88,6 +98,7 @@ def load_nrc_lexicon():
     return nrc_all_languages, sentiment_names
 
 
+"""
 def load_bing_opinion_lexicon():
     bing_filename = "opinion-lexicon-English"
     if not os.path.isdir(os.path.join(LBSA_DATA_DIR, "bing")):
@@ -100,7 +111,36 @@ def load_bing_opinion_lexicon():
         rar = rarfile.RarFile(filepath)
         rar.extractall(path=os.path.join(LBSA_DATA_DIR, "bing"))
         # TODO
+"""
 
+
+def load_mpqa_sujectivity_lexicon(name='', organization='', email=''):
+    if not os.path.isdir(os.path.join(LBSA_DATA_DIR, "mpqa")):
+        os.makedirs(os.path.join(LBSA_DATA_DIR, "mpqa"))
+    filepath = os.path.join(LBSA_DATA_DIR, 'mpqa/subjectivity_clues_hltemnlp05/subjclueslen1-HLTEMNLP05.tff')
+    if not os.path.exists(filepath):
+        response = requests.post(
+            "http://mpqa.cs.pitt.edu/request_resource.php",
+            data={"name": "", "organization": "", "email": "", "dataset":"subj_lexicon"})
+        zf = zipfile.ZipFile(io.BytesIO(response.content))
+        zf.extractall(path=os.path.join(LBSA_DATA_DIR, "mpqa"))
+    
+    with open(filepath) as f:
+        words, positive, negative, strong_subj = list(), list(), list(), list()
+        for line in f.readlines():
+            items = line.rstrip().split(' ')
+            if len(items) == 6:
+                words.append(items[2].split('=')[1])
+                strong_subj.append(1 if (items[0].split('=')[1] == 'strongsubj') else 0)
+                positive.append(1 if items[5].split('=')[1] in ['positive', 'both'] else 0)
+                negative.append(1 if items[5].split('=')[1] in ['negative', 'both'] else 0)
+    return pd.DataFrame({
+        'english': words,
+        'positive': np.asarray(positive, dtype=np.int),
+        'negative': np.asarray(negative, dtype=np.int),
+        'strong_subjectivty': np.asarray(strong_subj, dtype=np.int)
+    })
+        
 
 def load_afinn_opinion_lexicon():
     if not os.path.isdir(os.path.join(LBSA_DATA_DIR, "afinn")):
@@ -118,7 +158,7 @@ def load_afinn_opinion_lexicon():
     words, values = list(), list()
     with open(os.path.join(LBSA_DATA_DIR, 'afinn/AFINN/AFINN-111.txt')) as f:
         for line in f.readlines():
-            items = line.split('\t')
+            items = line.rstrip().split('\t')
             if len(items) == 2:
                 words.append(items[0])
                 values.append(int(items[1]))
@@ -127,17 +167,15 @@ def load_afinn_opinion_lexicon():
     negatives = np.zeros(len(values), dtype=np.int)
     positives[values > 0] = values[values > 0]
     negatives[values < 0] = -values[values < 0]
-    data = pd.DataFrame({
+    return pd.DataFrame({
         'english': words,
         'positive': positives,
         'negative': negatives
     })
-    return data
 
 
 def tokenize(text):
-    re_tok = re.compile(f'([!"#$%&\'()*+,-./:;<=>?@[\\]^_`|~“”¨«»®´·º½¾¿¡§£₤‘’])')
-    return re_tok.sub(r' \1 ', text).split()
+    return TOKENIZER.sub(r' \1 ', text).split()
 
 
 def create_sa_lexicon(source='nrc', language='english'):
@@ -149,7 +187,7 @@ def create_sa_lexicon(source='nrc', language='english'):
             tag_names.remove(tag_name)
         lexicon = Lexicon(nrc_all_languages, tag_names, source, language=language)
     else:
-        pass # TODO: error
+        raise UnknownSource('Source %s does not provide any available sentiment analysis lexicon')
     return lexicon
 
 
@@ -164,8 +202,11 @@ def create_opinion_lexicon(source='nrc', language='english'):
     elif source == 'afinn':
         ol = load_afinn_opinion_lexicon()
         lexicon = Lexicon(ol, ['positive', 'negative'], source, language=language)
+    elif source == 'mpqa':
+        ol = load_mpqa_sujectivity_lexicon()
+        lexicon = Lexicon(ol, ['positive', 'negative', 'strong_subjectivty'], source, language=language)
     else:
-        pass # TODO: error
+        raise UnknownSource('Source %s does not provide any available opinion/subjectivity lexicon')
     return lexicon
 
 
