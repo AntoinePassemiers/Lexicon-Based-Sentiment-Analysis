@@ -14,6 +14,7 @@ $ sudo python setup.py install
 ### Dependencies
 
 * numpy >= 1.13.3
+* pandas >= 0.20.1
 * matplotlib >= 2.0.2 (optional)
 * xlrd
 

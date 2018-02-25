@@ -19,11 +19,6 @@ except ImportError: # Python 2
     from urllib2 import urlretrieve
 
 
-home = os.path.expanduser("~")
-LBSA_DATA_DIR = os.path.join(home, 'lbsa_data')
-if not os.path.isdir(LBSA_DATA_DIR):
-    os.makedirs(LBSA_DATA_DIR)
-
 TOKENIZER = re.compile(f'([!"#$%&\'()*+,-./:;<=>?@[\\]^_`|~“”¨«»®´·º½¾¿¡§£₤‘’])')
 
 
@@ -70,7 +65,16 @@ class Lexicon:
         return len(self.dataframe)
 
 
+def get_cache_dir():
+    home = os.path.expanduser("~")
+    LBSA_DATA_DIR = os.path.join(home, '.lbsa')
+    if not os.path.isdir(LBSA_DATA_DIR):
+        os.makedirs(LBSA_DATA_DIR)
+    return LBSA_DATA_DIR
+
+
 def load_nrc_lexicon():
+    LBSA_DATA_DIR = get_cache_dir()
     nrc_filename = "NRC-Emotion-Lexicon-v0.92-InManyLanguages-web"
     if not os.path.exists(os.path.join(LBSA_DATA_DIR, "%s.csv" % nrc_filename)):
         # Download lexicon in XLSX format
@@ -100,6 +104,7 @@ def load_nrc_lexicon():
 
 """
 def load_bing_opinion_lexicon():
+    LBSA_DATA_DIR = get_cache_dir()
     bing_filename = "opinion-lexicon-English"
     if not os.path.isdir(os.path.join(LBSA_DATA_DIR, "bing")):
         os.makedirs(os.path.join(LBSA_DATA_DIR, "bing"))
@@ -115,6 +120,7 @@ def load_bing_opinion_lexicon():
 
 
 def load_mpqa_sujectivity_lexicon(name='', organization='', email=''):
+    LBSA_DATA_DIR = get_cache_dir()
     if not os.path.isdir(os.path.join(LBSA_DATA_DIR, "mpqa")):
         os.makedirs(os.path.join(LBSA_DATA_DIR, "mpqa"))
     filepath = os.path.join(LBSA_DATA_DIR, 'mpqa/subjectivity_clues_hltemnlp05/subjclueslen1-HLTEMNLP05.tff')
@@ -143,6 +149,7 @@ def load_mpqa_sujectivity_lexicon(name='', organization='', email=''):
         
 
 def load_afinn_opinion_lexicon():
+    LBSA_DATA_DIR = get_cache_dir()
     if not os.path.isdir(os.path.join(LBSA_DATA_DIR, "afinn")):
         os.makedirs(os.path.join(LBSA_DATA_DIR, "afinn"))
     if not os.path.exists(os.path.join(LBSA_DATA_DIR, "afinn/AFINN/AFINN-111.txt")):
