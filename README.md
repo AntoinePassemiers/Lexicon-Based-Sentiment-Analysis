@@ -51,6 +51,6 @@ This should be used with large texts, such as blogs, books, articles, etc.
 
 ![alt text](imgs/zarathustra.png)
 
-This figure was obtained using the following example:
+Check the full example:
 
-[Full example](https://github.com/AntoinePassemiers/Lexicon-Based-Sentiment-Analysis/blob/master/src/example.py)
+[Full example](https://github.com/AntoinePassemiers/Lexicon-Based-Sentiment-Analysis/blob/master/src/examples/example.py)
