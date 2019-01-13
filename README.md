@@ -1,8 +1,6 @@
 [![Travis-CI Build Status](https://travis-ci.org/AntoinePassemiers/Lexicon-Based-Sentiment-Analysis.svg?branch=master)](https://travis-ci.org/AntoinePassemiers/Lexicon-Based-Sentiment-Analysis)
 # LBSA - Lexicon-based Sentiment Analysis
 
-http://www.saifmohammad.com/WebPages/lexicons.html
-
 ## Installation
 
 From the parent folder, install the library by typing the following command:
@@ -15,7 +13,6 @@ $ sudo python setup.py install
 
 * numpy >= 1.13.3
 * pandas >= 0.21.0
-* matplotlib >= 2.0.2 (optional)
 * xlrd
 
 ## Features

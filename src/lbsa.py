@@ -121,17 +121,19 @@ def load_nrc_lexicon():
         """
         filepath = os.path.join(LBSA_DATA_DIR, "%s.xlsx" % nrc_filename)
         try:
-            df = pd.read_excel(filepath, sheet_name='NRC-Emotion-Lexicon-v0.92-InMan')
+            wb = xlrd.open_workbook(os.path.join(LBSA_DATA_DIR, "%s.xlsx" % nrc_filename))
         except:
             download_lexicon()
             try:
-                df = pd.read_excel(filepath, sheet_name='NRC-Emotion-Lexicon-v0.92-InMan')
+                wb = xlrd.open_workbook(os.path.join(LBSA_DATA_DIR, "%s.xlsx" % nrc_filename))
             except:
                 print('Error: Could not download NRC lexicon.')
+        # Convert from XLSX to CSV file
+        sheet = wb.sheet_by_name('NRC-Emotion-Lexicon-v0.92-InMan')
         with open(os.path.join(LBSA_DATA_DIR, "%s.csv" % nrc_filename), mode='w', encoding='utf8') as csv_file:
             writer = csv.writer(csv_file, quoting=csv.QUOTE_ALL)
-            for index, row in df.iterrows():
-                writer.writerow(''.join([str(el) for el in row]))
+            for rownum in range(sheet.nrows):
+                writer.writerow(sheet.row_values(rownum))
         
         # Remove XLSX file
         os.remove(os.path.join(LBSA_DATA_DIR, "%s.xlsx" % nrc_filename))
