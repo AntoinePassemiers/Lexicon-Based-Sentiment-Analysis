@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import os
 import re
+import sys
 import io
 import pickle
 import xlrd
@@ -26,8 +27,6 @@ class UnknownSource(Exception):
     def __init__(self, *args, **kwargs):
         Exception.__init__(self, *args, **kwargs)
 
-
-# http://sentiment.christopherpotts.net/lexicons.html#resources
 
 class Lexicon:
 
@@ -65,6 +64,30 @@ class Lexicon:
         return len(self.dataframe)
 
 
+class DownloadProgressBar:
+
+    def __init__(self, prefix, length=30):
+        self.prefix = prefix
+        self.length = length
+        self.downloaded = 0
+        self.total_size = None
+        self.update(0)
+
+    def progress_hook(self, count, block_size, total_size):
+        self.total_size = total_size
+        self.downloaded += block_size
+        progress = np.clip(float(self.downloaded) / float(self.total_size), 0., 1.)
+        self.update(progress)
+
+    def update(self, progress):
+        percent = 100. * progress
+        n_blocks = int(np.round(progress * self.length))
+        bar = ('=' * n_blocks).ljust(self.length)
+        sys.stdout.write('\r%s [%s] %.2f %%\r' % (self.prefix, bar, percent))
+        if self.downloaded == self.total_size:
+            sys.stdout.write('\n')
+
+
 def get_cache_dir():
     home = os.path.expanduser("~")
     LBSA_DATA_DIR = os.path.join(home, '.lbsa')
@@ -76,19 +99,39 @@ def get_cache_dir():
 def load_nrc_lexicon():
     LBSA_DATA_DIR = get_cache_dir()
     nrc_filename = "NRC-Emotion-Lexicon-v0.92-InManyLanguages-web"
+
+    def download_lexicon():
+        LEXICON_URL = "http://www.saifmohammad.com/WebDocs/%s.xlsx" % nrc_filename
+        progressbar = DownloadProgressBar('Downloading NRC lexicon')
+        urlretrieve(
+                LEXICON_URL,
+                os.path.join(LBSA_DATA_DIR, "%s.xlsx" % nrc_filename),
+                reporthook=progressbar.progress_hook)
+        print('')
+
     if not os.path.exists(os.path.join(LBSA_DATA_DIR, "%s.csv" % nrc_filename)):
         # Download lexicon in XLSX format
         if not os.path.exists(os.path.join(LBSA_DATA_DIR, "%s.xlsx" % nrc_filename)):
-            LEXICON_URL = "http://www.saifmohammad.com/WebDocs/%s.xlsx" % nrc_filename
-            urlretrieve(LEXICON_URL, os.path.join(LBSA_DATA_DIR, "%s.xlsx" % nrc_filename))
+            download_lexicon()
 
         # Convert from XLSX to CSV file
+        """
         wb = xlrd.open_workbook(os.path.join(LBSA_DATA_DIR, "%s.xlsx" % nrc_filename))
         sheet = wb.sheet_by_name('NRC-Emotion-Lexicon-v0.92-InMan')
+        """
+        filepath = os.path.join(LBSA_DATA_DIR, "%s.xlsx" % nrc_filename)
+        try:
+            df = pd.read_excel(filepath, sheet_name='NRC-Emotion-Lexicon-v0.92-InMan')
+        except:
+            download_lexicon()
+            try:
+                df = pd.read_excel(filepath, sheet_name='NRC-Emotion-Lexicon-v0.92-InMan')
+            except:
+                print('Error: Could not download NRC lexicon.')
         with open(os.path.join(LBSA_DATA_DIR, "%s.csv" % nrc_filename), mode='w', encoding='utf8') as csv_file:
             writer = csv.writer(csv_file, quoting=csv.QUOTE_ALL)
-            for rownum in range(sheet.nrows):
-                writer.writerow(sheet.row_values(rownum))
+            for index, row in df.iterrows():
+                writer.writerow(''.join([str(el) for el in row]))
         
         # Remove XLSX file
         os.remove(os.path.join(LBSA_DATA_DIR, "%s.xlsx" % nrc_filename))
@@ -125,6 +168,7 @@ def load_mpqa_sujectivity_lexicon(name='', organization='', email=''):
         os.makedirs(os.path.join(LBSA_DATA_DIR, "mpqa"))
     filepath = os.path.join(LBSA_DATA_DIR, 'mpqa/subjectivity_clues_hltemnlp05/subjclueslen1-HLTEMNLP05.tff')
     if not os.path.exists(filepath):
+        print('Downloading mpqa lexicon...')
         response = requests.post(
             "http://mpqa.cs.pitt.edu/request_resource.php",
             data={"name": "", "organization": "", "email": "", "dataset":"subj_lexicon"})
@@ -156,7 +200,9 @@ def load_afinn_opinion_lexicon():
         # Download zip archive
         LEXICON_URL = 'http://www2.imm.dtu.dk/pubdb/views/edoc_download.php/6010/zip/imm6010.zip'
         filepath = os.path.join(LBSA_DATA_DIR, "afinn/imm6010.zip")
-        urlretrieve(LEXICON_URL, filepath)
+        progressbar = DownloadProgressBar('Downloading AFINN lexicon')
+        urlretrieve(LEXICON_URL, filepath, reporthook=progressbar.progress_hook)
+        print('')
         with zipfile.ZipFile(filepath) as zf:
             zf.extractall(path=os.path.join(LBSA_DATA_DIR, "afinn"))
         # Remove zip archive
@@ -188,7 +234,7 @@ def tokenize(text):
 def create_sa_lexicon(source='nrc', language='english'):
     if source == 'nrc':
         nrc_all_languages, tag_names = load_nrc_lexicon()
-        to_remove = ['positive', 'negative']
+        to_remove = ["anger", "anticipation", "disgust", "fear", "joy", "sadness", "surprise", "trust"]
         nrc_all_languages.drop(to_remove, axis=1, inplace=True)
         for tag_name in to_remove:
             tag_names.remove(tag_name)
@@ -201,7 +247,7 @@ def create_sa_lexicon(source='nrc', language='english'):
 def create_opinion_lexicon(source='nrc', language='english'):
     if source == 'nrc':
         nrc_all_languages, tag_names = load_nrc_lexicon()
-        to_remove = ["anger", "anticipation", "disgust", "fear", "joy", "sadness", "surprise", "trust"]
+        to_remove = ['positive', 'negative']
         nrc_all_languages.drop(to_remove, axis=1, inplace=True)
         for tag_name in to_remove:
             tag_names.remove(tag_name)
@@ -237,7 +283,5 @@ def make_time_analysis(text, lexicon):
         value = lexicon.get(token.lower())
         if value is not None:
             mask[token_id, :] += value
-    data = {
-        key: value for key, value in zip(tag_names, mask.T)
-    }
+    data = { key: value for key, value in zip(tag_names, mask.T) }
     return data
