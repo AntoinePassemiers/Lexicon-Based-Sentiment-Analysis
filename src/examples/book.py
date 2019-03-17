@@ -17,7 +17,7 @@ def moving_average(sequence, n=1000):
 # https://archive.org/stream/thusspokezarathu00nietuoft/thusspokezarathu00nietuoft_djvu.txt
 with open('../../data/thus_spoke_zarathustra.txt', 'r') as f:
     text = f.read()
-    lexicon = lbsa.create_sa_lexicon(language='english')
+    lexicon = lbsa.get_lexicon('sa', language='english')
     features = lbsa.make_time_analysis(text, lexicon)
 
     block_size = 100

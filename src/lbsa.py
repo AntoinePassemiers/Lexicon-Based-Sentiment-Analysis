@@ -20,10 +20,17 @@ except ImportError: # Python 2
     from urllib2 import urlretrieve
 
 
-TOKENIZER = re.compile(f'([!"#$%&\'()*+,-./:;<=>?@[\\]^_`|~“”¨«»®´·º½¾¿¡§£₤‘’])')
+TOKENIZER = re.compile(f'([!"#$%&\'()*+,-./:;<=>?@[\\]^_`|~“”¨«»®´·º½¾¿¡§£₤‘’\n\t])')
 
 
 class UnknownSource(Exception):
+
+    def __init__(self, *args, **kwargs):
+        Exception.__init__(self, *args, **kwargs)
+
+
+class LexiconException(Exception):
+
     def __init__(self, *args, **kwargs):
         Exception.__init__(self, *args, **kwargs)
 
@@ -54,14 +61,60 @@ class Lexicon:
     
     def get_tag_names(self):
         return self.tag_names
-    
-    def get_analysis(self, counters):
-        return {
-            name: counter for name, counter in zip(self.tag_names, counters)
-        }
+
+    def process(self, text, as_dict=True):
+        tokens = tokenize(text) if not isinstance(text, list) else text
+        n_tags = self.get_n_tags()
+        counters = np.zeros(n_tags, dtype=np.int)
+        for token in tokens:
+            value = self.get(token.lower())
+            if value is not None:
+                counters += value
+        if as_dict:
+            return { name: counter for name, counter in zip(self.tag_names, counters) }
+        else:
+            return counters
     
     def __len__(self):
         return len(self.dataframe)
+
+
+class FeatureExtractor:
+
+    def __init__(self, *args):
+        self.lexicons = list(args)
+        self.sizes = [lexicon.get_n_tags() for lexicon in self.lexicons]
+        self.offsets = np.cumsum([0] + self.sizes)
+        self.n_features = sum(self.sizes)
+        self.feature_names = list()
+        for lexicon in self.lexicons:
+            tag_names = [lexicon.source + '_' + name for name in lexicon.get_tag_names()]
+            self.feature_names += tag_names
+
+    def process(self, X):
+        if isinstance(X, str):
+            X = [X]
+        elif len(X) == 0:
+            return list()
+        features = np.empty((len(X), self.n_features))
+        for i, text in enumerate(X):
+            tokens = tokenize(text)
+            for j, lexicon in enumerate(self.lexicons):
+                features[i, self.offsets[j]:self.offsets[j+1]] = lexicon.process(tokens, as_dict=False)
+        return np.squeeze(features)
+
+
+def make_time_analysis(text, lexicon):
+    tokens = tokenize(text)
+    n_tags = lexicon.get_n_tags()
+    tag_names = lexicon.get_tag_names()
+    mask = np.zeros((len(tokens), n_tags), dtype=np.int)
+    for token_id, token in enumerate(tokens):
+        value = lexicon.get(token.lower())
+        if value is not None:
+            mask[token_id, :] += value
+    data = { key: value for key, value in zip(tag_names, mask.T) }
+    return data
 
 
 class DownloadProgressBar:
@@ -127,7 +180,7 @@ def load_nrc_lexicon():
             try:
                 wb = xlrd.open_workbook(os.path.join(LBSA_DATA_DIR, "%s.xlsx" % nrc_filename))
             except:
-                print('Error: Could not download NRC lexicon.')
+                raise LexiconException('Error: Could not download NRC lexicon.')
         # Convert from XLSX to CSV file
         sheet = wb.sheet_by_name('NRC-Emotion-Lexicon-v0.92-InMan')
         with open(os.path.join(LBSA_DATA_DIR, "%s.csv" % nrc_filename), mode='w', encoding='utf8') as csv_file:
@@ -236,7 +289,7 @@ def tokenize(text):
 def create_sa_lexicon(source='nrc', language='english'):
     if source == 'nrc':
         nrc_all_languages, tag_names = load_nrc_lexicon()
-        to_remove = ["anger", "anticipation", "disgust", "fear", "joy", "sadness", "surprise", "trust"]
+        to_remove = ['positive', 'negative']
         nrc_all_languages.drop(to_remove, axis=1, inplace=True)
         for tag_name in to_remove:
             tag_names.remove(tag_name)
@@ -249,7 +302,7 @@ def create_sa_lexicon(source='nrc', language='english'):
 def create_opinion_lexicon(source='nrc', language='english'):
     if source == 'nrc':
         nrc_all_languages, tag_names = load_nrc_lexicon()
-        to_remove = ['positive', 'negative']
+        to_remove = ['anger', 'anticipation', 'disgust', 'fear', 'joy', 'sadness', 'surprise', 'trust']
         nrc_all_languages.drop(to_remove, axis=1, inplace=True)
         for tag_name in to_remove:
             tag_names.remove(tag_name)
@@ -265,25 +318,9 @@ def create_opinion_lexicon(source='nrc', language='english'):
     return lexicon
 
 
-def make_analysis(text, lexicon, as_dict=True):
-    tokens = tokenize(text)
-    n_tags = lexicon.get_n_tags()
-    counters = np.zeros(n_tags, dtype=np.int)
-    for token in tokens:
-        value = lexicon.get(token.lower())
-        if value is not None:
-            counters += value
-    return lexicon.get_analysis(counters) if as_dict else counters
-
-
-def make_time_analysis(text, lexicon):
-    tokens = tokenize(text)
-    n_tags = lexicon.get_n_tags()
-    tag_names = lexicon.get_tag_names()
-    mask = np.zeros((len(tokens), n_tags), dtype=np.int)
-    for token_id, token in enumerate(tokens):
-        value = lexicon.get(token.lower())
-        if value is not None:
-            mask[token_id, :] += value
-    data = { key: value for key, value in zip(tag_names, mask.T) }
-    return data
+def get_lexicon(lexicon_type, **kwargs):
+    assert(lexicon_type in ['sa', 'opinion'])
+    if lexicon_type == 'sa':
+        return create_sa_lexicon(**kwargs)
+    else:
+        return create_opinion_lexicon(**kwargs)

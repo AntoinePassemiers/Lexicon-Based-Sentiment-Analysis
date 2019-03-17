@@ -11,13 +11,17 @@ Republicans and Democrats must support our troops and support this Bill!
 """
 
 print('\nUse afinn lexicon')
-lexicon = lbsa.create_opinion_lexicon(language='english', source='afinn')
-print(lbsa.make_analysis(tweet, lexicon))
+lexicon = lbsa.get_lexicon('opinion', language='english', source='afinn')
+print(lexicon.process(tweet))
 
-print('\nUse nrc lexicon')
-lexicon = lbsa.create_opinion_lexicon(language='english', source='nrc')
-print(lbsa.make_analysis(tweet, lexicon))
+print('\nUse nrc opinion lexicon')
+lexicon = lbsa.get_lexicon('opinion', language='english', source='nrc')
+print(lexicon.process(tweet))
+
+print('\nUse nrc sentiment analysis lexicon')
+lexicon = lbsa.get_lexicon('sa', language='english', source='nrc')
+print(lexicon.process(tweet))
 
 print('\nUse mpqa lexicon')
-lexicon = lbsa.create_opinion_lexicon(language='english', source='mpqa')
-print(lbsa.make_analysis(tweet, lexicon))
+lexicon = lbsa.get_lexicon('opinion', language='english', source='mpqa')
+print(lexicon.process(tweet))

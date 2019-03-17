@@ -26,8 +26,8 @@ $ sudo python setup.py install
 ... It ends the dangerous sequester and gives Secretary Mattis what he needs to keep America Great.
 ... Republicans and Democrats must support our troops and support this Bill!
 ... """
->>> lexicon = lbsa.create_sa_lexicon(language='english', source='nrc')
->>> lbsa.make_analysis(tweet, lexicon)
+>>> sa_lexicon = lbsa.get_lexicon('sa', language='english', source='nrc')
+>>> sa_lexicon.process(tweet)
 {'anger': 0, 'anticipation': 0, 'disgust': 0, 'fear': 2, 'joy': 0, 'sadness': 0, 
 'surprise': 0, 'trust': 3}
 ```
@@ -35,19 +35,27 @@ $ sudo python setup.py install
 ### Opinion mining
 
 ```python
->>> lexicon = lbsa.create_opinion_lexicon(language='english', source='nrc')
->>> lbsa.make_analysis(tweet, lexicon)
+>>> op_lexicon = lbsa.get_lexicon('opinion', language='english', source='nrc')
+>>> op_lexicon.process(tweet)
 {'positive': 2, 'negative': 1}
 ```
 
-### Sentiment analysis over time
+### Feature extractor
 
-This should be used with large texts, such as blogs, books, articles, etc.
+```python
+>>> extractor = lbsa.FeatureExtractor(sa_lexicon, op_lexicon)
+>>> extractor.process(tweet)
+array([0., 0., 0., 2., 0., 0., 0., 3., 2., 1.])
+```
 
 #### Example
 
+Feature extractor:
+
+[feature_extraction.py](https://github.com/AntoinePassemiers/Lexicon-Based-Sentiment-Analysis/blob/master/src/examples/feature_extraction.py)
+
 ![alt text](imgs/zarathustra.png)
 
-Check the full example:
+Perform sentiment analysis over time on "Thus spoke Zarathustra":
 
-[Full example](https://github.com/AntoinePassemiers/Lexicon-Based-Sentiment-Analysis/blob/master/src/examples/example.py)
+[book.py](https://github.com/AntoinePassemiers/Lexicon-Based-Sentiment-Analysis/blob/master/src/examples/book.py)
