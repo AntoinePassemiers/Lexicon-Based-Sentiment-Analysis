@@ -105,7 +105,10 @@ class FeatureExtractor:
 
 
 def make_time_analysis(text, lexicon):
-    tokens = tokenize(text)
+    if isinstance(text, list):
+        tokens = text
+    else:
+        tokens = tokenize(text)
     n_tags = lexicon.get_n_tags()
     tag_names = lexicon.get_tag_names()
     mask = np.zeros((len(tokens), n_tags), dtype=np.int)
