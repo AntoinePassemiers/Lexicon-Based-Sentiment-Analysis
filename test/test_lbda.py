@@ -16,5 +16,5 @@ def test_lbsa():
     afinn_lexicon = lbsa.get_lexicon('opinion', language='english', source='afinn')
     mpqa_lexicon = lbsa.get_lexicon('opinion', language='english', source='mpqa')
 
-    extractor = lbsa.FeatureExtractor(afinn_lexicon, nrc_lexicon, nrc_sa_lexicon, mpqa_lexicon)
+    extractor = lbsa.FeatureExtractor(afinn_lexicon, mpqa_lexicon)
     extractor.process(reviews)
