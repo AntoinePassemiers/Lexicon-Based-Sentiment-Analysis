@@ -1,4 +1,5 @@
-[![Travis-CI Build Status](https://travis-ci.org/AntoinePassemiers/Lexicon-Based-Sentiment-Analysis.svg?branch=master)](https://travis-ci.org/AntoinePassemiers/Lexicon-Based-Sentiment-Analysis)
+[![Build status](https://github.com/antropie/cryptobot/actions/workflows/build.yml/badge.svg)](https://github.com/antropie/cryptobot/actions?query=build)
+[![Code analysis](https://github.com/antropie/cryptobot/actions/workflows/analysis.yml/badge.svg)](https://github.com/antropie/cryptobot/actions?query=analysis)
 # LBSA - Lexicon-based Sentiment Analysis
 
 Fast library for sentiment analysis, opinion mining and language detection.
