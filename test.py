@@ -1,6 +1,6 @@
-import requests, zipfile, io
-r = requests.post("http://mpqa.cs.pitt.edu/request_resource.php", data={"name":"bla", "organization":"yoyo", "email":"bla@yoyo.com", "dataset":"subj_lexicon"})
-z = zipfile.ZipFile(io.BytesIO(r.content))
-z.extractall()
+import pandas as pd
 
-#props to https://stackoverflow.com/a/14260592
+
+df = pd.read_excel('NRC-Emotion-Lexicon-v0.92-In105Languages-Nov2017Translations.xlsx', sheet_name='NRC-Lex-v0.92-word-translations')
+
+print(df)

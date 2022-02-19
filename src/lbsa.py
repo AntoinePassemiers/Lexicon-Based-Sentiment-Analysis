@@ -2,22 +2,20 @@
 # lbsa.py: lexicon-based sentiment analysis
 # author : Antoine Passemiers
 
-import numpy as np
-import pandas as pd
 import os
 import re
 import sys
 import io
 import pickle
-import xlrd
 import csv
 import zipfile
+import shutil
 import requests
 
-try: # Python 3
-    from urllib.request import urlretrieve
-except ImportError: # Python 2
-    from urllib2 import urlretrieve
+import numpy as np
+import pandas as pd
+
+from urllib.request import urlretrieve
 
 
 TOKENIZER = re.compile(f'([!"#$%&\'()*+,-./:;<=>?@[\\]^_`|~“”¨«»®´·º½¾¿¡§£₤‘’\n\t])')
@@ -42,19 +40,29 @@ class Lexicon:
         self.tag_names = tag_names
         self.source = source
         self.language = language
-        self.table = dict()
-        self.set_language(self.table, language)
 
-    def set_language(self, table, language):
-        tags = np.asarray(self.dataframe[self.tag_names])
-        for key, value in zip(self.dataframe[self.language], tags):
-            if value.sum() != 0:
-                table[key] = value
+        self.table = {}
+        for language in self.dataframe.columns:
+            if language in tag_names:
+                continue
+            language_formatted = Lexicon.reformat_language_name(language)
+            tags = np.asarray(self.dataframe[self.tag_names])
+            for key, value in zip(self.dataframe[language], tags):
+                if key not in self.table:
+                    self.table[key] = {}
+                self.table[key][language_formatted] = value
+
+    @staticmethod
+    def reformat_language_name(name):
+        name = name.lower().strip()
+        if '(' in name:
+            name = name.split('(')[0].strip()
+        return name
     
     def get(self, token):
         if token.isdigit():
             return None
-        return self.table.get(token)
+        return self.table.get(token, None)
     
     def get_n_tags(self):
         return len(self.tag_names)
@@ -65,13 +73,38 @@ class Lexicon:
     def process(self, text, as_dict=True):
         tokens = tokenize(text) if not isinstance(text, list) else text
         n_tags = self.get_n_tags()
-        counters = np.zeros(n_tags, dtype=np.int)
+        language_counts = {}
+        counts = {}
         for token in tokens:
-            value = self.get(token.lower())
-            if value is not None:
-                counters += value
+            results = self.get(token.lower())
+            if results is not None:
+                for language in results.keys():
+                    if language not in counts:
+                        counts[language] = np.zeros(n_tags, dtype=np.int)
+                    counts[language] += results[language]
+                    if language not in language_counts:
+                        language_counts[language] = 0
+                    language_counts[language] += 1
+
+        if len(counts) == 0:
+            counters = np.zeros(n_tags, dtype=np.int)
+        else:
+            # Select language
+            if self.language == 'auto':
+                languages = list(language_counts.keys())
+                total_counts = [language_counts[language] for language in languages]
+                language = languages[np.argmax(total_counts)]
+                counters = counts[language]
+            else:
+                language = self.language
+            if language not in counts:
+                raise LexiconException(f'Could not find language "{language}"')
+            counters = counts[language]
+
         if as_dict:
-            return { name: counter for name, counter in zip(self.tag_names, counters) }
+            data = { name: counter for name, counter in zip(self.tag_names, counters) }
+            data['lang'] = language
+            return data
         else:
             return counters
     
@@ -152,51 +185,40 @@ def get_cache_dir():
     return LBSA_DATA_DIR
 
 
-def load_nrc_lexicon():
+def load_nrc_lexicon(path=None):
     LBSA_DATA_DIR = get_cache_dir()
-    nrc_filename = "NRC-Emotion-Lexicon-v0.92-InManyLanguages-web"
+    nrc_filename = 'NRC-Emotion-Lexicon'
 
     def download_lexicon():
-        LEXICON_URL = "http://www.saifmohammad.com/WebDocs/%s.xlsx" % nrc_filename
-        progressbar = DownloadProgressBar('Downloading NRC lexicon')
-        urlretrieve(
-                LEXICON_URL,
-                os.path.join(LBSA_DATA_DIR, "%s.xlsx" % nrc_filename),
-                reporthook=progressbar.progress_hook)
-        print('')
+        if path is None:
+            LEXICON_URL = f'http://www.saifmohammad.com/WebDocs/Lexicons/{nrc_filename}.zip'
+            print('Downloading NRC lexicon...')
+            req = requests.get(LEXICON_URL)
+            with open(os.path.join(LBSA_DATA_DIR, f'{nrc_filename}.zip'), 'wb') as f:
+                f.write(req.content)
+            with zipfile.ZipFile(os.path.join(LBSA_DATA_DIR, f'{nrc_filename}.zip'), 'r') as zip_object:
+                zipObject.extract(
+                    os.path.join('NRC-Emotion-Lexicon-v0.92', 'NRC-Emotion-Lexicon-v0.92-In105Languages-Nov2017Translations.xlsx'),
+                    os.path.join(LBSA_DATA_DIR, f'{nrc_filename}.xlsx'))
+        else:
+            shutil.copyfile(path, os.path.join(LBSA_DATA_DIR, f'{nrc_filename}.xlsx'))
 
-    if not os.path.exists(os.path.join(LBSA_DATA_DIR, "%s.csv" % nrc_filename)):
+    if not os.path.exists(os.path.join(LBSA_DATA_DIR, f'{nrc_filename}.csv')):
         # Download lexicon in XLSX format
-        if not os.path.exists(os.path.join(LBSA_DATA_DIR, "%s.xlsx" % nrc_filename)):
+        if not os.path.exists(os.path.join(LBSA_DATA_DIR, f'{nrc_filename}.xlsx')):
             download_lexicon()
 
         # Convert from XLSX to CSV file
-        """
-        wb = xlrd.open_workbook(os.path.join(LBSA_DATA_DIR, "%s.xlsx" % nrc_filename))
-        sheet = wb.sheet_by_name('NRC-Emotion-Lexicon-v0.92-InMan')
-        """
-        filepath = os.path.join(LBSA_DATA_DIR, "%s.xlsx" % nrc_filename)
-        try:
-            wb = xlrd.open_workbook(os.path.join(LBSA_DATA_DIR, "%s.xlsx" % nrc_filename))
-        except:
-            download_lexicon()
-            try:
-                wb = xlrd.open_workbook(os.path.join(LBSA_DATA_DIR, "%s.xlsx" % nrc_filename))
-            except:
-                raise LexiconException('Error: Could not download NRC lexicon.')
-        # Convert from XLSX to CSV file
-        sheet = wb.sheet_by_name('NRC-Emotion-Lexicon-v0.92-InMan')
-        with open(os.path.join(LBSA_DATA_DIR, "%s.csv" % nrc_filename), mode='w', encoding='utf8') as csv_file:
-            writer = csv.writer(csv_file, quoting=csv.QUOTE_ALL)
-            for rownum in range(sheet.nrows):
-                writer.writerow(sheet.row_values(rownum))
+        filepath = os.path.join(LBSA_DATA_DIR, f'{nrc_filename}.xlsx')
+        df = pd.read_excel(filepath, sheet_name='NRC-Lex-v0.92-word-translations')
+        df.to_csv(os.path.join(LBSA_DATA_DIR, f'{nrc_filename}.csv'))
         
         # Remove XLSX file
         os.remove(os.path.join(LBSA_DATA_DIR, "%s.xlsx" % nrc_filename))
 
     sentiment_names = ["positive", "negative", "anger", "anticipation", "disgust", "fear", "joy", "sadness", "surprise", "trust"]
     lexicon_path = os.path.join(__file__, os.path.join(LBSA_DATA_DIR, '%s.csv' % nrc_filename))
-    nrc_all_languages = pd.read_csv(lexicon_path, encoding='utf8')
+    nrc_all_languages = pd.read_csv(lexicon_path, encoding='utf8', index_col=False)
     nrc_all_languages.rename(columns=lambda x: x.replace('Word', '').split('Translation')[0].rstrip(' ').lower(), inplace=True)
     for column_name in sentiment_names:
         nrc_all_languages[column_name] = nrc_all_languages[column_name].astype(np.int32)
@@ -220,7 +242,8 @@ def load_bing_opinion_lexicon():
 """
 
 
-def load_mpqa_sujectivity_lexicon(name='', organization='', email=''):
+def load_mpqa_sujectivity_lexicon(name='', organization='', email='', path=None):
+    assert path is None
     LBSA_DATA_DIR = get_cache_dir()
     if not os.path.isdir(os.path.join(LBSA_DATA_DIR, "mpqa")):
         os.makedirs(os.path.join(LBSA_DATA_DIR, "mpqa"))
@@ -250,21 +273,25 @@ def load_mpqa_sujectivity_lexicon(name='', organization='', email=''):
     })
         
 
-def load_afinn_opinion_lexicon():
+def load_afinn_opinion_lexicon(path=None):
     LBSA_DATA_DIR = get_cache_dir()
     if not os.path.isdir(os.path.join(LBSA_DATA_DIR, "afinn")):
         os.makedirs(os.path.join(LBSA_DATA_DIR, "afinn"))
     if not os.path.exists(os.path.join(LBSA_DATA_DIR, "afinn/AFINN/AFINN-111.txt")):
-        # Download zip archive
-        LEXICON_URL = 'http://www2.imm.dtu.dk/pubdb/views/edoc_download.php/6010/zip/imm6010.zip'
-        filepath = os.path.join(LBSA_DATA_DIR, "afinn/imm6010.zip")
-        progressbar = DownloadProgressBar('Downloading AFINN lexicon')
-        urlretrieve(LEXICON_URL, filepath, reporthook=progressbar.progress_hook)
-        print('')
-        with zipfile.ZipFile(filepath) as zf:
-            zf.extractall(path=os.path.join(LBSA_DATA_DIR, "afinn"))
-        # Remove zip archive
-        os.remove(filepath)
+
+        if path is None:
+            # Download zip archive
+            LEXICON_URL = 'http://www2.imm.dtu.dk/pubdb/views/edoc_download.php/6010/zip/imm6010.zip'
+            filepath = os.path.join(LBSA_DATA_DIR, "afinn/imm6010.zip")
+            progressbar = DownloadProgressBar('Downloading AFINN lexicon')
+            urlretrieve(LEXICON_URL, filepath, reporthook=progressbar.progress_hook)
+            print('')
+            with zipfile.ZipFile(filepath) as zf:
+                zf.extractall(path=os.path.join(LBSA_DATA_DIR, "afinn"))
+            # Remove zip archive
+            os.remove(filepath)
+        else:
+            shutil.copyfile(path, os.path.join(LBSA_DATA_DIR, 'afinn/AFINN/AFINN-111.txt'))
     
     words, values = list(), list()
     with open(os.path.join(LBSA_DATA_DIR, 'afinn/AFINN/AFINN-111.txt')) as f:
@@ -289,9 +316,9 @@ def tokenize(text):
     return TOKENIZER.sub(r' \1 ', text).split()
 
 
-def create_sa_lexicon(source='nrc', language='english'):
+def create_sa_lexicon(source='nrc', language='english', path=None):
     if source == 'nrc':
-        nrc_all_languages, tag_names = load_nrc_lexicon()
+        nrc_all_languages, tag_names = load_nrc_lexicon(path=path)
         to_remove = ['positive', 'negative']
         nrc_all_languages.drop(to_remove, axis=1, inplace=True)
         for tag_name in to_remove:
@@ -302,19 +329,19 @@ def create_sa_lexicon(source='nrc', language='english'):
     return lexicon
 
 
-def create_opinion_lexicon(source='nrc', language='english'):
+def create_opinion_lexicon(source='nrc', language='english', path=None):
     if source == 'nrc':
-        nrc_all_languages, tag_names = load_nrc_lexicon()
+        nrc_all_languages, tag_names = load_nrc_lexicon(path=path)
         to_remove = ['anger', 'anticipation', 'disgust', 'fear', 'joy', 'sadness', 'surprise', 'trust']
         nrc_all_languages.drop(to_remove, axis=1, inplace=True)
         for tag_name in to_remove:
             tag_names.remove(tag_name)
         lexicon = Lexicon(nrc_all_languages, tag_names, source, language=language)
     elif source == 'afinn':
-        ol = load_afinn_opinion_lexicon()
+        ol = load_afinn_opinion_lexicon(path=path)
         lexicon = Lexicon(ol, ['positive', 'negative'], source, language=language)
     elif source == 'mpqa':
-        ol = load_mpqa_sujectivity_lexicon()
+        ol = load_mpqa_sujectivity_lexicon(path=path)
         lexicon = Lexicon(ol, ['positive', 'negative', 'strong_subjectivty'], source, language=language)
     else:
         raise UnknownSource('Source %s does not provide any available opinion/subjectivity lexicon')

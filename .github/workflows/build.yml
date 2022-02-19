@@ -1,0 +1,43 @@
+name: build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [3.8]
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Compile the Boost.Python module
+      run: |
+        sudo apt-get install libboost-python-dev
+        cd cpp
+        make githubwf=1
+        cd ..
+    - name: Install dependencies
+      run: |
+        python3 -m pip install --upgrade pip
+        python3 -m pip install pytest nose coverage
+        python3 setup.py install
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+    - name: Configure cc-test-reporter
+      run: |
+        curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter
+        chmod +x ./cc-test-reporter
+        ./cc-test-reporter before-build
+    - name: Test with nose
+      run: |
+        coverage run -m nose -v test

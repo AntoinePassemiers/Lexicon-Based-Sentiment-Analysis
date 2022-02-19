@@ -11,7 +11,7 @@ datafiles = [(d, [os.path.join(d, f) for f in files])
 
 setup(
     name='lbsa',
-    version='1.0.0',
+    version='0.0.1',
     author='Antoine Passemiers',
     description='Lexicon-based sentiment analysis',
     packages = find_packages('src'),
@@ -23,6 +23,6 @@ setup(
     install_requires=[
         'numpy >= 1.13.3',
         'matplotlib >= 2.0.2',
-        'nltk >= 3.2.3'
+        'pandas'
     ],
 )
