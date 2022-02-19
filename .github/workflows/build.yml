@@ -23,8 +23,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
-        python3 -m pip install --upgrade pip
-        python3 -m pip install pytest nose coverage
+        python3 -m pip install numpy pytest nose coverage
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         python3 setup.py install
     - name: Configure cc-test-reporter
