@@ -37,20 +37,19 @@ class Lexicon:
 
     def __init__(self, dataframe, tag_names, source, language='english'):
         self.dataframe = dataframe
+        self.dataframe.columns = [Lexicon.reformat_language_name(c) for c in self.dataframe.columns]
         self.tag_names = tag_names
         self.source = source
         self.language = language
-
+        tags = np.asarray(self.dataframe[self.tag_names])
         self.table = {}
         for language in self.dataframe.columns:
             if language in tag_names:
                 continue
-            language_formatted = Lexicon.reformat_language_name(language)
-            tags = np.asarray(self.dataframe[self.tag_names])
             for key, value in zip(self.dataframe[language], tags):
                 if key not in self.table:
                     self.table[key] = {}
-                self.table[key][language_formatted] = value
+                self.table[key][language] = value
 
     @staticmethod
     def reformat_language_name(name):
@@ -98,8 +97,10 @@ class Lexicon:
             else:
                 language = self.language
             if language not in counts:
-                raise LexiconException(f'Could not find language "{language}"')
-            counters = counts[language]
+                # raise LexiconException(f'Could not find language "{language}". Found: {counts.keys()}')
+                counters = np.zeros(n_tags, dtype=np.int)
+            else:
+                counters = counts[language]
 
         if as_dict:
             data = { name: counter for name, counter in zip(self.tag_names, counters) }
