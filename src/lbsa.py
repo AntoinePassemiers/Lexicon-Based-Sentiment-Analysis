@@ -37,7 +37,7 @@ class Lexicon:
 
     def __init__(self, dataframe, tag_names, source, language='english'):
         self.dataframe = dataframe
-        self.dataframe.columns = [Lexicon.reformat_language_name(c) for c in self.dataframe.columns]
+        self.dataframe.rename(columns={c: Lexicon.reformat_language_name(c) for c in self.dataframe.columns}, inplace=True)
         self.tag_names = tag_names
         self.source = source
         self.language = language
@@ -46,7 +46,14 @@ class Lexicon:
         for language in self.dataframe.columns:
             if language in tag_names:
                 continue
-            for key, value in zip(self.dataframe[language], tags):
+            if language.startswith('unnamed'):
+                continue
+
+            words = self.dataframe[language]
+            if isinstance(words, pd.DataFrame):
+                words = words.iloc[:, 0]
+
+            for key, value in zip(words, tags):
                 if key not in self.table:
                     self.table[key] = {}
                 self.table[key][language] = value
@@ -59,8 +66,6 @@ class Lexicon:
         return name
     
     def get(self, token):
-        if token.isdigit():
-            return None
         return self.table.get(token, None)
     
     def get_n_tags(self):
